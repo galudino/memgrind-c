@@ -4,3 +4,6 @@
 [submodule "libs/cgcs_ulog"]
 	path = libs/cgcs_ulog
 	url = git@github.com:galudino/cgcs_ulog
+[submodule "libs/cgcs_vector_ptr"]
+	path = libs/cgcs_vector_ptr
+	url = git@github.com:galudino/cgcs_vector_ptr

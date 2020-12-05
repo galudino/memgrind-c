@@ -1,0 +1,6 @@
+[submodule "libs/cgcs_malloc"]
+	path = libs/cgcs_malloc
+	url = git@github.com:galudino/cgcs_malloc
+[submodule "libs/cgcs_ulog"]
+	path = libs/cgcs_ulog
+	url = git@github.com:galudino/cgcs_ulog

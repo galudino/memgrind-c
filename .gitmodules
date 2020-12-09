@@ -7,3 +7,6 @@
 [submodule "libs/cgcs_vector_ptr"]
 	path = libs/cgcs_vector_ptr
 	url = git@github.com:galudino/cgcs_vector_ptr
+[submodule "libs/cgcs_vector"]
+	path = libs/cgcs_vector
+	url = git@github.com:galudino/cgcs_vector

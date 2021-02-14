@@ -4,62 +4,8 @@
     
     \author     Gemuele Aludino
     \date       13 Feb 2021
- */
 
-#define CGCS_MALLOC_ENABLE_LOGGING
-#include "memgrind_c.h"
-
-#ifdef CGCS_MALLOC_ENABLE_LOGGING
-#define listlog() header_fputs(stdout, __FILE__, __func__, __LINE__)
-#else
-#define listlog()
-#endif
-
-#include "cgcs_ulog.h"
-
-#define USE_CGCS_VECTOR
-#include "cgcs_vector.h"
-
-#define USE_CGCS_MALLOC
-#include "cgcs_malloc.h"
-
-#include <stdio.h>
-#include <stdarg.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <math.h>
-
-// Unit conversion functions from ns (s/ms/mcs)
-//static double convert_ns_to_s(double nanoseconds);
-//static double convert_ns_to_ms(double nanoseconds);
-static double convert_ns_to_mcs(double nanoseconds);
-
-// Calculate elapsed time
-static double elapsed_time_ns(struct timespec *before, 
-                              struct timespec *after);
-
-/*
-static double elapsed_time_ms(struct timespec *before, 
-                              struct timespec *after);
-*/
-
-/*
-static double elapsed_time_s(struct timespec *before, 
-                             struct timespec *after);
-*/
-
-// Random number generator, given an open/close range [minimum, maximum)
-static int randrnge(int minimum, int maximum);
-
-// Randomly generate true or false
-static bool randbool();
-
-// Random string generator, of size length, into buffer
-static char *randstr(char *buffer, size_t length);
-
-/*
+    \details
     memgrind unit tests
  
     A:  malloc() 1 byte and immediately free it - do this 150 times
@@ -111,6 +57,27 @@ static char *randstr(char *buffer, size_t length);
     Be sure to discuss your findings, especially any interesting or unexpected
     results.
  */
+
+#define CGCS_MALLOC_ENABLE_LOGGING
+
+/*
+#define MGR_ENABLE_TEST_A
+#define MGR_ENABLE_TEST_B
+#define MGR_ENABLE_TEST_C
+#define MGR_ENABLE_TEST_D
+#define MGR_ENABLE_TEST_E
+*/
+#define MGR_ENABLE_TEST_F
+
+#include "memgrind_c.h"
+
+#include "cgcs_ulog.h"
+#include "cgcs_vector.h"
+#include "cgcs_malloc.h"
+
+#include <stdarg.h>
+#include <stdint.h>
+
 typedef void (*memgrind_func_t)(uint32_t, uint32_t, uint32_t);
 
 void mgr_run_test( memgrind_func_t test,
@@ -147,15 +114,6 @@ void mgr_vector(uint32_t min, uint32_t max, uint32_t initial);
 
 #define MGR_MAX_ITER 100
 
-#define MCS "µs"
-
-#define RANDSTR__CHARS                                                         \
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.-#'?!;"
-
-int cstr_compare(const void *c0, const void *c1) {
-    return strcmp(*(char **)(c0), *(char **)(c1));
-}
-
 /*!
     \brief      Program execution begins and ends here.
  
@@ -174,77 +132,75 @@ int main(int argc, const char *argv[]) {
     // Important for randomization.
     srand(time(NULL));
 
-    fprintf(stdout, "\n%s%s%s\n", KGRN_b, "cgcs memory allocator stress tests", KNRM);
-    
-    fprintf(stdout,
-            "Each individual test is run %lu times and wall-clock time "
-            "averaged.\n\n",
-            (long int)MGR_MAX_ITER);
-    
-    fprintf(stdout, "All times are expressed in microseconds (%s)\n\n", MCS);
+    fprintf(stream, "\n%s\n"
+                    "%s %lu %s\n\n"
+                    "%s (%s)\n\n"
+                    "%s\n"
+                    "%s\t\t%s\t\t%s\t\t%s\n"
+                    "%s\n",
+                    KGRN_b"cgcs memory allocator stress tests"KNRM,
+                    "Each indvidual test is run", (long int)(MGR_MAX_ITER), "times and wall-clock time averaged.",
+                    "All times are expressed in", MCS,
+                    "-------------------------------------------------------------",
+                    KWHT_b"test"KNRM, KWHT_b"mean"KNRM, KWHT_b"slowest"KNRM, KWHT_b"total"KNRM,
+                    "-------------------------------------------------------------"
+    );
 
-    fprintf(stdout,
-            "-------------------------------------------------------------\n");
-    fprintf(stdout,
-            "%s%s%s\t\t%s%s%s\t\t%s%s%s\t\t%s%s%s\n",
-            KWHT_b,
-            "test",
-            KNRM,
-            KWHT_b,
-            "mean",
-            KNRM,
-            KWHT_b,
-            "slowest",
-            KNRM,
-            KWHT_b,
-            "total",
-            KNRM);
-    printf("-------------------------------------------------------------\n");
-
+    #ifdef MGR_ENABLE_TEST_A
     mgr_run_test(mgr_simple_alloc_free,        // test a 
                   'a',                         // alloc 1 byte, free 1 byte 
                   MGR_A_ITER_MAX,              // run 150 times 
                   1,                           // allocation size: 1 byte 
                   0,                           // (unused parameter) 
                   stream);                     // output to stdout 
+    #endif
 
+    #ifdef MGR_ENABLE_TEST_B
     mgr_run_test(mgr_alloc_array_interval,     // test b 
                   'b',                         // allocate to limit, then free 
                   MGR_B_ITER_MAX,              // run 150 times 
                   1,                           // allocation size: 1 byte 
                   MGR_B_INTERVAL,              // limit: 50 
                   stream);                     // output to stdout 
+    #endif
 
+    #ifdef MGR_ENABLE_TEST_C
     mgr_run_test(mgr_alloc_array_range,        // test c 
                   'c',                         // randomly alloc/free 1 byte 
                   MGR_C_ITER_MAX,              // run 50 times 
                   1,                           // allocation size min: 1 byte 
                   1,                           // allocation size max: 1 byte 
                   stream);                     // output to stdout 
+    #endif
 
+    #ifdef MGR_ENABLE_TEST_D
     mgr_run_test(mgr_alloc_array_range,        // test d 
                   'd',                         // randomly alloc/free 
                   MGR_D_ITER_MAX,              // run 50 times 
                   MGR_D_ALLOC_MIN,             // allocation size min: 1 byte 
                   MGR_D_ALLOC_MAX,             // allocation size max: 64 bytes 
                   stream);                     // output to stdout 
+    #endif
 
+    #ifdef MGR_ENABLE_TEST_E
     mgr_run_test(mgr_char_ptr_array,           // test e 
                   'e',                         // buffer of random-size buffers 
                   MGR_E_MIN,                   // min buffer size: 29 bytes 
                   MGR_E_MAX,                   // max buffer size: 59 bytes 
                   0,                           // (unused parameter) 
                   stream);                     // output to stdout 
+    #endif
 
+    #ifdef MGR_ENABLE_TEST_F
     mgr_run_test(mgr_vector,                   // test f 
                   'f',                         // "vector" of string test 
                   MGR_F_MIN,                   // min string size: 8 bytes 
                   MGR_F_MAX,                   // max string size: 32 bytes 
                   MGR_F_INITIAL,               // initial vector size: 5 elems 
                   stream);                     // output to stdout 
+    #endif
 
     fprintf(stream, "\n");
-
     return EXIT_SUCCESS;
 }
 
@@ -273,7 +229,7 @@ void mgr_run_test( memgrind_func_t test,
     double time_slowest = 0.0;
     double time_this = 0.0;
 
-    for (uint32_t i = 0; i < 1; i++) {
+    for (uint32_t i = 0; i < 1; ++i) {
         clock_gettime(CLOCK_REALTIME, &x);  // start clock
         test(min, max, interval);           // run test
         clock_gettime(CLOCK_REALTIME, &y);  // stop clock
@@ -316,12 +272,13 @@ void mgr_run_test( memgrind_func_t test,
 void mgr_simple_alloc_free(uint32_t max_iter, uint32_t alloc_sz, uint32_t unused_value) {
     listlog();
 
-    for (uint32_t i = 0; i < max_iter; i++) {
-        char *ch = NULL;
-        ch = malloc(alloc_sz);
+    for (uint32_t i = 0; i < max_iter; ++i) {
+        char *ch = cgcs_malloc(alloc_sz);
+        listlog();
 
-        if (ch) {
-            free(ch);
+        if (ch) { 
+            cgcs_free(ch);
+            listlog();
         }
     }
 
@@ -342,13 +299,13 @@ void mgr_alloc_array_interval(uint32_t max_iter, uint32_t alloc_sz, uint32_t int
 
     // ptr to buffer of ptrs to char buffer
     // alloc memory for buffer of pointers and establish sentinel
-    char **ch_ptrarr = malloc(sizeof *ch_ptrarr * max_iter);
+    char **ch_ptrarr = cgcs_malloc(sizeof *ch_ptrarr * max_iter);
     char **sentinel = ch_ptrarr + interval;
 
     uint32_t i = 0;             // runs from [0, max_iter)
     
     while (i < max_iter) {
-        char *ch = malloc(alloc_sz);  // allocate memory for ptr to char buffer
+        char *ch = cgcs_malloc(alloc_sz);  // allocate memory for ptr to char buffer
 
         if (ch) {
             ch_ptrarr[i++] = ch;
@@ -364,14 +321,14 @@ void mgr_alloc_array_interval(uint32_t max_iter, uint32_t alloc_sz, uint32_t int
                 /*
                     Retrieve the (i - j)th address from ch_ptrarr.
                     We allocate alloc_sz bytes interval times,
-                    then do interval free() calls for each 
+                    then do interval cgcs_free() calls for each 
                     alloc_sz byte allocations.
                 */
                 char **curr = ch_ptrarr + (i - j);
 
                 if ((*curr)) {
                     // Free the pointer to char buffer.
-                    free((*curr));
+                    cgcs_free((*curr));
                 }
 
                 --j;
@@ -391,7 +348,7 @@ void mgr_alloc_array_interval(uint32_t max_iter, uint32_t alloc_sz, uint32_t int
         and max_iter deallocations, we free the
         pointer to the buffer of pointers to char buffers.
     */
-    free(ch_ptrarr);
+    cgcs_free(ch_ptrarr);
 
     listlog();
 }
@@ -413,7 +370,7 @@ void mgr_alloc_array_range(uint32_t max_allocs, uint32_t alloc_sz_min, uint32_t 
 
     bool hit_max_allocs = false;
 
-    char **ch_ptrarr = malloc(sizeof *ch_ptrarr * max_allocs);
+    char **ch_ptrarr = cgcs_malloc(sizeof *ch_ptrarr * max_allocs);
     memset(ch_ptrarr, 0, max_allocs);
 
     uint32_t k = 0;
@@ -443,7 +400,7 @@ void mgr_alloc_array_range(uint32_t max_allocs, uint32_t alloc_sz_min, uint32_t 
             nonnull = (*curr) != NULL;
 
             if (nonnull) {
-                free((*curr));
+                cgcs_free((*curr));
                 (*curr) = NULL;
 
 #ifdef CGCS_MALLOC_ENABLE_LOGGING
@@ -468,7 +425,7 @@ void mgr_alloc_array_range(uint32_t max_allocs, uint32_t alloc_sz_min, uint32_t 
                     nonnull = (*curr) != NULL;
 
                     if (nonnull) {
-                        free((*curr));
+                        cgcs_free((*curr));
                         (*curr) = NULL;
 
 #ifdef CGCS_MALLOC_ENABLE_LOGGING
@@ -493,7 +450,7 @@ void mgr_alloc_array_range(uint32_t max_allocs, uint32_t alloc_sz_min, uint32_t 
                     nonnull = (*curr);
 
                     if (nonnull) {
-                        free((*curr));
+                        cgcs_free((*curr));
                         (*curr) = NULL;
 
                         LOG(__FILE__, KYEL_b "freed");
@@ -528,7 +485,7 @@ void mgr_alloc_array_range(uint32_t max_allocs, uint32_t alloc_sz_min, uint32_t 
         ++k;
     }
 
-    free(ch_ptrarr);
+    cgcs_free(ch_ptrarr);
     ch_ptrarr = NULL;
 
 #ifdef CGCS_MALLOC_ENABLE_LOGGING
@@ -564,18 +521,18 @@ void mgr_alloc_array_range(uint32_t max_allocs, uint32_t alloc_sz_min, uint32_t 
     \param[in]  unused_value unused value - needed for function uniformity
  */
 void mgr_char_ptr_array(uint32_t min, uint32_t max, uint32_t unused_value) { 
-    char **ch_ptrarr = malloc(sizeof *ch_ptrarr * max);
+    char **ch_ptrarr = cgcs_malloc(sizeof *ch_ptrarr * max);
 
-    for (uint32_t i = 0; i < max; i++) {
-        ch_ptrarr[i] = malloc(randrnge(1, max + 1));
+    for (uint32_t i = 0; i < max; ++i) {
+        ch_ptrarr[i] = cgcs_malloc(randrnge(1, max + 1));
     }
 
-    for (uint32_t i = 0; i < max; i++) {
+    for (uint32_t i = 0; i < max; ++i) {
         bool to_erase = randbool();
 
         if (to_erase) {
             if (ch_ptrarr[i]) {
-                free(ch_ptrarr[i]);
+                cgcs_free(ch_ptrarr[i]);
                 ch_ptrarr[i] = NULL;
             }
         }
@@ -585,10 +542,10 @@ void mgr_char_ptr_array(uint32_t min, uint32_t max, uint32_t unused_value) {
     listlog();
 #endif
 
-    for (uint32_t i = 0; i < max; i++) {
+    for (uint32_t i = 0; i < max; ++i) {
         if (ch_ptrarr[i] == NULL) {
             int num = randrnge(min, max + 1);
-            ch_ptrarr[i] = malloc(num);
+            ch_ptrarr[i] = cgcs_malloc(num);
         }
     }
 
@@ -596,13 +553,13 @@ void mgr_char_ptr_array(uint32_t min, uint32_t max, uint32_t unused_value) {
     listlog();
 #endif
 
-    for (uint32_t i = 0; i < max; i++) {
+    for (uint32_t i = 0; i < max; ++i) {
         if (ch_ptrarr[i]) {
-            free(ch_ptrarr[i]);
+            cgcs_free(ch_ptrarr[i]);
         }
     }
 
-    free(ch_ptrarr);
+    cgcs_free(ch_ptrarr);
 
 #ifdef CGCS_MALLOC_ENABLE_LOGGING
     listlog();
@@ -628,10 +585,10 @@ void mgr_char_ptr_array(uint32_t min, uint32_t max, uint32_t unused_value) {
                     freed and its pointer will be assigned the base address
                     of the new buffer.
 
-                for i = [0, vector_size(v))
+                for i = [0, vsize(v))
                     Decide where the string at i should be kept, or freed.
   
-                size = vector_size(v)
+                size = vsize(v)
 
                 for i = [0, size)
                     randomly generate a string of size min and max
@@ -645,171 +602,133 @@ void mgr_char_ptr_array(uint32_t min, uint32_t max, uint32_t unused_value) {
     \param[in]  initial initial starting size of vector's buffer
  */
 void mgr_vector(uint32_t min, uint32_t max, uint32_t initial) {
-    /*
-    vector *v = malloc(sizeof *v);
-    vinit(v, initial);
-    */
-    vector *v = vnew(initial);
+    char buffer[MGR_F_MAX];
 
-#ifdef CGCS_MALLOC_ENABLE_LOGGING
-    listlog();
-#endif
-
-    char buffer[MGR_F_MAX + 1];
-    
-    // Add max randomly sized strings to vector's internal buffer.
-    for (int i = 0; i < max; i++) {
-        // Create a random string, of random length [1, max + 1)
-        // Store the string in a temporary buffer.
-        int num = randrnge(1, max + 1);
-        randstr(buffer, num);
-
-        // buffer will be deep-copied into vector's internal buffer.
-        vpushb(v, buffer);
+    cgcs_vector *v = cgcs_malloc(sizeof *v);
+    //vinit(v, 5);
+    {
+        v->m_impl.m_start = cgcs_malloc(sizeof *v->m_impl.m_start * initial);
+        v->m_impl.m_finish = v->m_impl.m_start;
+        v->m_impl.m_end_of_storage = v->m_impl.m_start + initial;
     }
 
 #ifdef CGCS_MALLOC_ENABLE_LOGGING
     listlog();
 #endif
 
-    // Iterate over all of the elements, on each iteration, 
-    // arbitrarily decide to keep the current element, 
-    // or destroy it/erase it from the vector.
-    for (int i = 0; i < vsize(v); i++) {
-        bool do_erase = randbool();
+    for (uint32_t i = 0; i < max; ++i) {
+        int length = randrnge(1, max);
 
-        if (do_erase) {
-            verase(v, vbegin(v) + i);
+        char *str = randstr(buffer, length);
+
+        char *ptr = cgcs_malloc(length + 1);
+        strcpy(ptr, str);
+
+        //cgcs_vpushb(v, &ptr);
+        /*
+            All of the cgcs_vector functions
+            use malloc/realloc/free from stdlib.h.
+
+            The cgcs_vector functions that use the stdlib memory allocation
+            procedures will have code redefined inline for this test.
+         */
+        {  
+            if (v->m_impl.m_finish == v->m_impl.m_end_of_storage) {
+                //vresize(cgcs_vcapacity(v) * 2);
+                {
+                    size_t capacity = cgcs_vcapacity(v);
+                
+                    //cgcs_vector_base_resize_block(v->m_impl, cgcs_cgcs_vsize(v), cgcs_vcapacity(v));
+                    {
+                        void **start = cgcs_malloc(sizeof *start * (capacity * 2));
+                        memcpy(start, v->m_impl.m_start, sizeof *v->m_impl.m_start * capacity);
+                        cgcs_free(v->m_impl.m_start);
+
+                        v->m_impl.m_start = start;
+                        v->m_impl.m_finish = v->m_impl.m_start + capacity;
+                        v->m_impl.m_end_of_storage = v->m_impl.m_start + (capacity * 2);
+                    }
+                }
+            }
+
+            *v->m_impl.m_finish++ = ptr;
         }
     }
 
-    const size_t size = vsize(v);
+#ifdef CGCS_MALLOC_ENABLE_LOGGING
+    listlog();
+#endif
 
-    // Add size randomly sized strings to vector's internal buffer.
-    for (int i = 0; i < size; i++) {
-        // Create a random string, of random length [min, max + 1)
-        // Store the string in a temporary buffer.
-        int num = randrnge(min, max + 1);
-        randstr(buffer, num);
+    cgcs_vector_iterator it = cgcs_vbegin(v);
+    cgcs_vector_iterator end = cgcs_vend(v);
 
-        // buffer will be deep-copied into vector's internal buffer.
-        vpushb(v, buffer);
+    while (it < end) {
+        if (randrnge(false, true)) {
+            char **victim = (char **)(it);
+            cgcs_free(*victim);
+
+            it = cgcs_verase(v, it);
+        } else {
+            ++it;
+        }
     }
 
+    size_t size = cgcs_vsize(v);
+
+    for (size_t i = 0; i < size; ++i) {
+        int length = randrnge(min, max);
+        char *str = randstr(buffer, length);
+
+        char *ptr = cgcs_malloc(length + 1);
+        strcpy(ptr, str);
+
+        //cgcs_vpushb(v, &ptr);
+        /*
+            All of the cgcs_vector functions
+            use malloc/realloc/free from stdlib.h.
+
+            The cgcs_vector functions that use the stdlib memory allocation
+            procedures will have code redefined inline for this test.
+         */
+        {  
+            if (v->m_impl.m_finish == v->m_impl.m_end_of_storage) {
+                //vresize(cgcs_vcapacity(v) * 2);
+                {
+                    size_t capacity = cgcs_vcapacity(v);
+                
+                    //cgcs_vector_base_resize_block(v->m_impl, cgcs_vsize(v), cgcs_vcapacity(v));
+                    {
+                        void **start = cgcs_malloc(sizeof *start * (capacity * 2));
+                        memcpy(start, v->m_impl.m_start, sizeof *v->m_impl.m_start * capacity);
+                        cgcs_free(v->m_impl.m_start);
+
+                        v->m_impl.m_start = start;
+                        v->m_impl.m_finish = v->m_impl.m_start + capacity;
+                        v->m_impl.m_end_of_storage = v->m_impl.m_start + (capacity * 2);
+                    }
+                }
+            }
+
+            *v->m_impl.m_finish++ = ptr;
+        }
+    }
+
+    while (cgcs_vempty(v) == false) {
+        char **back = (char **)(cgcs_vback(v));
+        cgcs_free(*back);
+        cgcs_vpopb(v);
+    }
+
+    //cgcs_vdeinit(v);
+    {
+        cgcs_free(v->m_impl.m_start);
+    }
+
+    cgcs_free(v);
+
 #ifdef CGCS_MALLOC_ENABLE_LOGGING
     listlog();
-#endif /* CGCS_MALLOC_ENABLE_LOGGING */
-
-    /*
-    vdeinit(v);
-    free(v);
-    */
-    vdelete(v);
-
-#ifdef CGCS_MALLOC_ENABLE_LOGGING
-    listlog();
-#endif /* CGCS_MALLOC_ENABLE_LOGGING */
-}
-
-/*!
-    \brief
-    
-    \param[in]  nanoseconds
-
-    \return
- */
-/*
-static inline double convert_ns_to_s(double nanoseconds) {
-    return nanoseconds * pow(10.0, -9.0);
-}
-*/
-/*!
-    \brief
-    
-    \param[in]  nanoseconds
-
-    \return
- */
-/*
-static inline double convert_ns_to_ms(double nanoseconds) {
-    return nanoseconds * pow(10.0, -6.0);
-}
-*/
-
-/*!
-    \brief
-    
-    \param[in]  nanoseconds
-
-    \return
- */
-static inline double convert_ns_to_mcs(double nanoseconds) {
-    return nanoseconds * pow(10.0, -3.0);
-}
-
-/*!
-    \brief
-    
-    \param[in]  before
-    \param[in]  after
-
-    \return
- */
-static inline double elapsed_time_ns(struct timespec *before, 
-                                     struct timespec *after) {
-   return ((pow(10.0, 9.0) * after->tv_sec) + after->tv_nsec)
-   - ((pow(10.0, 9.0) * before->tv_sec) + before->tv_nsec);
-}
-
-/*!
-    \brief
-    
-    \param[in]  before
-    \param[in]  after
-
-    \return
- */
-/*
-static inline double elapsed_time_ms(struct timespec *before, 
-                                     struct timespec *after) {
-    return elapsed_time_ns(before, after) * pow(10.0, -6.0);
-}
-*/
-
-/*!
-    \brief
-    
-    \param[in]  before
-    \param[in]  after
-
-    \return
- */
-/*
-static inline double elapsed_time_s(struct timespec *before, 
-                                    struct timespec *after) {
-    return elapsed_time_ns(before, after) * pow(10.0, -9.0);
-}
-*/
-
-/*!
-    \brief
-    
-    \param[in]  minimum
-    \param[in]  maximum
-
-    \return
- */
-static inline int randrnge(int minimum, int maximum) {
-    return (rand() % (maximum - minimum)) + minimum;
-}
-
-/*!
-    \brief
-
-    \return
- */
-static inline bool randbool() {
-    return (rand() % ((true + 1) - false)) + false;
+#endif
 }
 
 /*!
@@ -818,7 +737,7 @@ static inline bool randbool() {
     \param[out] buffer  buffer to hold the characters for the string
     \param[in]  length  the desired length for the generated string
  */
-static char *randstr(char *buffer, size_t length) {
+char *randstr(char *buffer, size_t length) {
     const char *charset 
     = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.-#'?!;";
     

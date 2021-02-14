@@ -604,13 +604,7 @@ void mgr_char_ptr_array(uint32_t min, uint32_t max, uint32_t unused_value) {
 void mgr_vector(uint32_t min, uint32_t max, uint32_t initial) {
     char buffer[MGR_F_MAX];
 
-    cgcs_vector *v = cgcs_malloc(sizeof *v);
-    //vinit(v, 5);
-    {
-        v->m_impl.m_start = cgcs_malloc(sizeof *v->m_impl.m_start * initial);
-        v->m_impl.m_finish = v->m_impl.m_start;
-        v->m_impl.m_end_of_storage = v->m_impl.m_start + initial;
-    }
+    cgcs_vector *v = cgcs_vnew_allocfn(initial, cgcs_malloc);
 
 #ifdef CGCS_MALLOC_ENABLE_LOGGING
     listlog();
@@ -618,41 +612,11 @@ void mgr_vector(uint32_t min, uint32_t max, uint32_t initial) {
 
     for (uint32_t i = 0; i < max; ++i) {
         int length = randrnge(1, max);
-
         char *str = randstr(buffer, length);
-
         char *ptr = cgcs_malloc(length + 1);
         strcpy(ptr, str);
-
-        //cgcs_vpushb(v, &ptr);
-        /*
-            All of the cgcs_vector functions
-            use malloc/realloc/free from stdlib.h.
-
-            The cgcs_vector functions that use the stdlib memory allocation
-            procedures will have code redefined inline for this test.
-         */
-        {  
-            if (v->m_impl.m_finish == v->m_impl.m_end_of_storage) {
-                //vresize(cgcs_vcapacity(v) * 2);
-                {
-                    size_t capacity = cgcs_vcapacity(v);
-                
-                    //cgcs_vector_base_resize_block(v->m_impl, cgcs_cgcs_vsize(v), cgcs_vcapacity(v));
-                    {
-                        void **start = cgcs_malloc(sizeof *start * (capacity * 2));
-                        memcpy(start, v->m_impl.m_start, sizeof *v->m_impl.m_start * capacity);
-                        cgcs_free(v->m_impl.m_start);
-
-                        v->m_impl.m_start = start;
-                        v->m_impl.m_finish = v->m_impl.m_start + capacity;
-                        v->m_impl.m_end_of_storage = v->m_impl.m_start + (capacity * 2);
-                    }
-                }
-            }
-
-            *v->m_impl.m_finish++ = ptr;
-        }
+    
+        cgcs_vpushb_allocfreefn(v, &ptr, cgcs_malloc, cgcs_free);
     }
 
 #ifdef CGCS_MALLOC_ENABLE_LOGGING
@@ -678,39 +642,10 @@ void mgr_vector(uint32_t min, uint32_t max, uint32_t initial) {
     for (size_t i = 0; i < size; ++i) {
         int length = randrnge(min, max);
         char *str = randstr(buffer, length);
-
         char *ptr = cgcs_malloc(length + 1);
         strcpy(ptr, str);
 
-        //cgcs_vpushb(v, &ptr);
-        /*
-            All of the cgcs_vector functions
-            use malloc/realloc/free from stdlib.h.
-
-            The cgcs_vector functions that use the stdlib memory allocation
-            procedures will have code redefined inline for this test.
-         */
-        {  
-            if (v->m_impl.m_finish == v->m_impl.m_end_of_storage) {
-                //vresize(cgcs_vcapacity(v) * 2);
-                {
-                    size_t capacity = cgcs_vcapacity(v);
-                
-                    //cgcs_vector_base_resize_block(v->m_impl, cgcs_vsize(v), cgcs_vcapacity(v));
-                    {
-                        void **start = cgcs_malloc(sizeof *start * (capacity * 2));
-                        memcpy(start, v->m_impl.m_start, sizeof *v->m_impl.m_start * capacity);
-                        cgcs_free(v->m_impl.m_start);
-
-                        v->m_impl.m_start = start;
-                        v->m_impl.m_finish = v->m_impl.m_start + capacity;
-                        v->m_impl.m_end_of_storage = v->m_impl.m_start + (capacity * 2);
-                    }
-                }
-            }
-
-            *v->m_impl.m_finish++ = ptr;
-        }
+        cgcs_vpushb_allocfreefn(v, &ptr, cgcs_malloc, cgcs_free);
     }
 
     while (cgcs_vempty(v) == false) {
@@ -719,12 +654,7 @@ void mgr_vector(uint32_t min, uint32_t max, uint32_t initial) {
         cgcs_vpopb(v);
     }
 
-    //cgcs_vdeinit(v);
-    {
-        cgcs_free(v->m_impl.m_start);
-    }
-
-    cgcs_free(v);
+    cgcs_vdelete_freefn(v, cgcs_free);
 
 #ifdef CGCS_MALLOC_ENABLE_LOGGING
     listlog();

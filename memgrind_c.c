@@ -58,15 +58,15 @@
     results.
  */
 
-#define CGCS_MALLOC_ENABLE_LOGGING
+#define _POSIX_C_SOURCE 199390L
 
-/*
+//#define CGCS_MALLOC_ENABLE_LOGGING
+
 #define MGR_ENABLE_TEST_A
 #define MGR_ENABLE_TEST_B
 #define MGR_ENABLE_TEST_C
 #define MGR_ENABLE_TEST_D
 #define MGR_ENABLE_TEST_E
-*/
 #define MGR_ENABLE_TEST_F
 
 #include "memgrind_c.h"
@@ -233,7 +233,7 @@ void mgr_run_test( memgrind_func_t test,
         clock_gettime(CLOCK_REALTIME, &x);  // start clock
         test(min, max, interval);           // run test
         clock_gettime(CLOCK_REALTIME, &y);  // stop clock
-
+        
         time_this = elapsed_time_ns(&x, &y);
         time_slowest = time_this > time_slowest ? time_this : time_slowest;
 
@@ -356,7 +356,7 @@ void mgr_alloc_array_interval(uint32_t max_iter, uint32_t alloc_sz, uint32_t int
 /*!
     \brief  Test c/d: Randomly choose between 
             alloc_sz_min and alloc_sz_max byte(s)
-            to allocated, repeats until max_allocs mallocs are made
+            to allocate, repeats until max_allocs mallocs are made
   
     \param[in]  max_allocs      nonnegative value, max allocations for test
     \param[in]  alloc_sz_min    nonnegative value, minimum malloc size
@@ -378,9 +378,7 @@ void mgr_alloc_array_range(uint32_t max_allocs, uint32_t alloc_sz_min, uint32_t 
     while (count.to_free > 0) {
         char **curr = NULL;
 
-        //bool *allocated = NULL;
         bool nonnull = false;
-
         bool max_allocs_met = (count.allocs == max_allocs);
 
         uint32_t offset = 0;
@@ -418,6 +416,7 @@ void mgr_alloc_array_range(uint32_t max_allocs, uint32_t alloc_sz_min, uint32_t 
 #ifdef CGCS_MALLOC_ENABLE_LOGGING
                 LOG(__FILE__, "will free");
 #endif
+
                 if (count.allocs > 0) {
                     offset = count.allocs - 1;
 
@@ -441,35 +440,15 @@ void mgr_alloc_array_range(uint32_t max_allocs, uint32_t alloc_sz_min, uint32_t 
                     LOG(__FILE__, KRED_b "nothing to free");
 #endif
                 }
-
-                /*
-                if (count.allocs > 0) {
-                    offset = randrnge(0, count.allocs);
-
-                    curr = ch_ptrarr + offset;
-                    nonnull = (*curr);
-
-                    if (nonnull) {
-                        cgcs_free((*curr));
-                        (*curr) = NULL;
-
-                        LOG(__FILE__, KYEL_b "freed");
-                    } else {
-                        LOG(__FILE__, KRED_b "nothing to free");
-                    }
-                } else {
-                    LOG(__FILE__, KRED_b "nothing to free");
-                }
-                */
             } else {
                 char *ch = NULL;
                 uint32_t size = 0;
 
                 size = alloc_sz_min == alloc_sz_max ?
                            alloc_sz_min :
-                           randrnge(alloc_sz_min, alloc_sz_max + 1);
+                           randrnge(alloc_sz_min, alloc_sz_max);
 
-                ch = malloc(size);
+                ch = cgcs_malloc(size);
 
                 if (ch) {
                     *(ch_ptrarr + count.allocs) = ch;
@@ -602,20 +581,33 @@ void mgr_char_ptr_array(uint32_t min, uint32_t max, uint32_t unused_value) {
     \param[in]  initial initial starting size of vector's buffer
  */
 void mgr_vector(uint32_t min, uint32_t max, uint32_t initial) {
-    char buffer[MGR_F_MAX];
+    ///
+    /// Begin allocation/construction of cgcs_vector
+    ///   
 
+    // Create an instance of cgcs_vector on the heap using cgcs_malloc,
+    // and initialize its buffer with cgcs_malloc
     cgcs_vector *v = cgcs_vnew_allocfn(initial, cgcs_malloc);
 
 #ifdef CGCS_MALLOC_ENABLE_LOGGING
     listlog();
 #endif
 
+    // Create a local array of char as temporary storage
+    // for a randomized string
+    char buffer[MGR_F_MAX];
+
+    // for i = [0...max + 1), randomly generate a string of size [1, max],
+    // store it in buffer, then duplicate buffer in a heap-allocated
+    // instance, where ptr is that duplicate buffer's base address.
+    // Push ptr to v.
     for (uint32_t i = 0; i < max; ++i) {
         int length = randrnge(1, max);
         char *str = randstr(buffer, length);
+
         char *ptr = cgcs_malloc(length + 1);
         strcpy(ptr, str);
-    
+
         cgcs_vpushb_allocfreefn(v, &ptr, cgcs_malloc, cgcs_free);
     }
 
@@ -623,38 +615,54 @@ void mgr_vector(uint32_t min, uint32_t max, uint32_t initial) {
     listlog();
 #endif
 
-    cgcs_vector_iterator it = cgcs_vbegin(v);
-    cgcs_vector_iterator end = cgcs_vend(v);
+   // Iterate over each element in v and decide at random
+   // whether to keep it or delete it.
+   // Note that cgcs_vector_iterator is a (char **) --
+   // it is the address of a (char *) within v's buffer.
+   cgcs_vector_iterator it = cgcs_vbegin(v);
+   
+   while (it < cgcs_vend(v)) {
+       if (randbool()) {
+           // First, we must retrieve the (char *) in question
+           // so we can release the memory at its address.
+           cgcs_free(*it);
 
-    while (it < end) {
-        if (randrnge(false, true)) {
-            char **victim = (char **)(it);
-            cgcs_free(*victim);
+           // Then, we can "erase the slot" where that (char *)
+           // once resided.
+           // verase will move all (char *) from (it + 1) to (vend(v) - 1);
+           // the (char *) at it will be overwritten.
+           it = cgcs_verase(v, it);
+       } else {
+           ++it;
+       }
+   }
 
-            it = cgcs_verase(v, it);
-        } else {
-            ++it;
-        }
-    }
+   // Add more randomized strings to v.
+   // This time, each randomized string length can range from [min, max].
+   size_t size = cgcs_vsize(v);
 
-    size_t size = cgcs_vsize(v);
+   for (size_t i = 0; i < size; ++i) {
+       int length = randrnge(min, max);
+       char *str = randstr(buffer, length);
 
-    for (size_t i = 0; i < size; ++i) {
-        int length = randrnge(min, max);
-        char *str = randstr(buffer, length);
-        char *ptr = cgcs_malloc(length + 1);
-        strcpy(ptr, str);
+       char *ptr = cgcs_malloc(length + 1);
+       strcpy(ptr, str);
 
-        cgcs_vpushb_allocfreefn(v, &ptr, cgcs_malloc, cgcs_free);
-    }
+       cgcs_vpushb_allocfreefn(v, &ptr, cgcs_malloc, cgcs_free);
+   }
 
-    while (cgcs_vempty(v) == false) {
-        char **back = (char **)(cgcs_vback(v));
-        cgcs_free(*back);
-        cgcs_vpopb(v);
-    }
+   ///
+   /// Begin destruction/delete of cgcs_vector.
+   ///
+   
+   // Iterate from back to front, free each (char *) in v's buffer.
+   for (it = cgcs_vend(v) - 1; it >= cgcs_vbegin(v); it--) {
+       cgcs_free(*it);
+   }
 
-    cgcs_vdelete_freefn(v, cgcs_free);
+   // Destroy the heap-allocated instance of cgcs_vector's buffer,
+   // then free the cgcs_vector instance itself
+   cgcs_vdelete_freefn(v, cgcs_free);
 
 #ifdef CGCS_MALLOC_ENABLE_LOGGING
     listlog();

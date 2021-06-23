@@ -50,8 +50,6 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
-
+build
 *.DS_Store
-
-memgrind_c
-memgrind_c_debug
+*.swp

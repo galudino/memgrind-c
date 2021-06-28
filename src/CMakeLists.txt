@@ -8,5 +8,5 @@ set(CMAKE_CXX_STANDARD ${CXX_STANDARD})
 set(CMAKE_CXX_FLAGS ${CFLAGS})
 
 add_executable("memgrind-c" "memgrind_c.h" "memgrind_c.c")
-add_compile_options("memgrind-c" PUBLIC "-fblocks")
+target_compile_options("memgrind-c" PUBLIC "-fblocks")
 target_link_libraries("memgrind-c" LINK_PUBLIC "cgcs_malloc" "cgcs_vector" "cgcs_ulog")
